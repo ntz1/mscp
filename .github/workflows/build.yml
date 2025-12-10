@@ -1,0 +1,192 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: 'Select build'
+        default: 'all'
+        type: choice
+        options:
+          - linux-x86_64
+          - linux-aarch64
+          - windows-x86_64
+          - all
+
+jobs:
+  define_matrix:
+    name: Set build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix_config: ${{ steps.set_matrix.outputs.matrix }}
+
+    steps:
+      - id: set_matrix
+        name: Define and Filter Matrix
+        env:
+          TARGETS: ${{ github.event.inputs.targets }}
+        run: |
+          BUILDS='[
+            {
+              "name": "linux-x86_64",
+              "system": "Linux",
+              "toolchain": "musl",
+              "arch": "x86_64",
+              "suffix": ""
+            },
+            {
+              "name": "linux-aarch64",
+              "system": "Linux",
+              "toolchain": "musl",
+              "arch": "aarch64",
+              "suffix": ""
+            }
+          ]'
+            # {
+            #   "name": "windows-x86_64",
+            #   "system": "Windows",
+            #   "toolchain": "mingw",
+            #   "arch": "x86_64",
+            #   "suffix": ".exe"
+            # }
+
+          FILTERED_BUILDS=$(echo "$BUILDS" | jq -c '[.[] | select(
+              (env.TARGETS == "all") or (env.TARGETS == .name)
+          )]')
+
+          echo "matrix=$FILTERED_BUILDS" | tee -a $GITHUB_OUTPUT
+
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: define_matrix
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.define_matrix.outputs.matrix_config) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # - name: Configure Fast APT Mirror
+      #   uses: vegardit/fast-apt-mirror.sh@v1
+
+      # # ==========================================================
+      # # SETUP TOOLCHAINS
+      # # ==========================================================
+      # - name: Setup MinGW
+      #   if: matrix.toolchain == 'mingw'
+      #   run: |
+      #     sudo apt-get install -y gcc-mingw-w64-x86-64-posix
+
+      #     echo "CC=x86_64-w64-mingw32-gcc-posix" >> $GITHUB_ENV
+      #     echo "WINDRES=x86_64-w64-mingw32-windres" >> $GITHUB_ENV
+
+      - name: Setup Musl
+        if: matrix.toolchain == 'musl'
+        run: |
+          MUSL_TARGET="${{ matrix.arch }}-unknown-linux-musl"
+          URL="https://github.com/cross-tools/musl-cross/releases/latest/download/$MUSL_TARGET.tar.xz"
+
+          wget -q $URL
+
+          sudo mkdir -p /opt/musl-cross
+          sudo tar -xf $MUSL_TARGET.tar.xz -C /opt/musl-cross
+
+          TOOLCHAIN_ROOT="/opt/musl-cross/$MUSL_TARGET"
+
+          echo "CC=$TOOLCHAIN_ROOT/bin/$MUSL_TARGET-gcc" >> $GITHUB_ENV
+
+      - name: Setup Root Path
+        run: |
+          echo "TARGET_DIR=${{ github.workspace }}/deps" >> $GITHUB_ENV
+          mkdir -p ${{ github.workspace }}/deps
+
+      # ==========================================================
+      # DEPENDENCIES
+      # ==========================================================
+      - name: Build zlib
+        run: |
+          ZLIB_VER=zlib-1.3.1
+          wget -q https://www.zlib.net/$ZLIB_VER.tar.gz
+          tar -xzf $ZLIB_VER.tar.gz
+          cd $ZLIB_VER
+
+          ./configure --prefix=$TARGET_DIR --static
+          make -j$(nproc) && make install
+
+          echo "Checking for zlib..."
+          ls -l $TARGET_DIR/lib/libz.a
+          ls -l $TARGET_DIR/include/zlib.h
+
+      - name: Build openssl
+        run: |
+          OPENSSL_VER=openssl-3.5.4
+          wget -q https://www.openssl.org/source/$OPENSSL_VER.tar.gz
+          tar -xzf $OPENSSL_VER.tar.gz
+          cd $OPENSSL_VER
+
+          # if [ "${{ matrix.toolchain }}" = "mingw" ]; then
+          #    SSL_TARGET="mingw64"
+          # else
+             SSL_TARGET=${{ matrix.name }}
+          # fi
+
+          ./Configure $SSL_TARGET no-shared --prefix=$TARGET_DIR --libdir=lib
+          make -j$(nproc) && make install_sw
+
+          echo "Checking for openssl..."
+          ls -l $TARGET_DIR/lib/libcrypto.a
+          ls -l $TARGET_DIR/include/openssl/ssl.h
+
+      # ==========================================================
+      # PREPARE PROJECT
+      # ==========================================================
+      - name: Patch libssh
+        run: |
+          git submodule update --init
+          patch -d libssh -p1 < patch/$(git -C libssh describe --tags).patch
+
+      # ==========================================================
+      # FINAL BUILD
+      # ==========================================================
+      - name: Final Build
+        run: |
+          mkdir build && cd build
+
+          TOOLCHAIN_FILE=${{ matrix.toolchain }}.cmake
+          cat <<EOF > $TOOLCHAIN_FILE
+          set(CMAKE_SYSTEM_NAME ${{ matrix.system }})
+          set(CMAKE_C_COMPILER "$CC")
+          set(CMAKE_CXX_COMPILER "$CXX")
+          set(CMAKE_FIND_ROOT_PATH "$TARGET_DIR")
+          set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+          set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+          set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+          set(BUILD_SHARED_LIBS OFF)
+          set(CMAKE_EXE_LINKER_FLAGS "-static -static-libgcc")
+          EOF
+
+          cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN_FILE \
+            -DCMAKE_PREFIX_PATH=$TARGET_DIR \
+            -DOPENSSL_USE_STATIC_LIBS=TRUE \
+            -DZLIB_LIBRARY=$TARGET_DIR/lib/libz.a \
+            -DZLIB_INCLUDE_DIR=$TARGET_DIR/include \
+            -DOPENSSL_ROOT_DIR=$TARGET_DIR \
+            -DOPENSSL_CRYPTO_LIBRARY=$TARGET_DIR/lib/libcrypto.a \
+            -DOPENSSL_INCLUDE_DIR=$TARGET_DIR/include
+
+          make -j$(nproc)
+
+      # ==========================================================
+      # ARTIFACTS
+      # ==========================================================
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mscp-${{ matrix.name }}
+          path: build/mscp${{ matrix.suffix }}
