@@ -7,6 +7,27 @@
 
 #include <strerrno.h>
 
+#if defined(_WIN32)
+/* * Private XSI-compliant implementation of strerror_r for MinGW/Windows.
+ * This is safe because the caller (strerrno) already uses a thread-local buffer.
+ */
+int strerror_r(int errnum, char *buf, size_t buflen)
+{
+    const char *err_str = strerror(errnum); 
+    
+    if (err_str) {
+        // Copy the error string to the provided buffer
+        strncpy(buf, err_str, buflen);
+        buf[buflen - 1] = '\0'; // Ensure null termination
+        return 0; // Success
+    }
+    
+    // Fallback if strerror fails
+    snprintf(buf, buflen, "Unknown error %d", errnum);
+    return -1; 
+}
+#endif
+
 #define STRERRNO_TLS_BUFSIZ 128
 __thread char tls_strerrno_buf[STRERRNO_TLS_BUFSIZ];
 

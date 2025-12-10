@@ -7,6 +7,7 @@
 #include "libssh/sftp.h"
 
 #include <mscp.h>
+#include <platform.h>
 
 /* ssh_init_sftp_session() creates sftp_session. sshdst accpets
  * user@hostname and hostname notations (by libssh).

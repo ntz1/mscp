@@ -12,6 +12,15 @@
 #include <print.h>
 #include <platform.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#include <io.h> // For _findfirst, etc., often used in MinGW
+#include <limits.h>
+#ifndef lstat
+#define lstat stat
+#endif
+#endif
+
 sftp_session __thread tls_sftp;
 /* tls_sftp is used *_wrapped() functions */
 
@@ -148,7 +157,14 @@ int mscp_mkdir(const char *path, mode_t mode, sftp_session sftp)
 		ret = sftp_mkdir(sftp, path, mode);
 		sftp_err_to_errno(sftp);
 	} else
+#if defined(_WIN32)
+		// On Windows/MinGW, the mode argument is often ignored or
+		// the function only takes one argument. We drop the 'mode' argument here.
+		ret = mkdir(path); 
+#else
+		// On POSIX systems (Linux, macOS, etc.), use the two-argument version.
 		ret = mkdir(path, mode);
+#endif
 
 	if (ret < 0 && errno == EEXIST) {
 		ret = 0;
@@ -165,17 +181,26 @@ static void sftp_attr_to_stat(sftp_attributes attr, struct stat *st)
 	st->st_gid = attr->gid;
 	st->st_mode = attr->permissions;
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__FreeBSD__)
 #define st_atim st_atimespec
 #define st_mtim st_mtimespec
 #define st_ctim st_ctimespec
 #endif
+
+#if defined(_WIN32)
+	// MinGW/Windows uses direct time_t members
+	st->st_atime = attr->atime;
+	st->st_mtime = attr->mtime;
+	st->st_ctime = attr->createtime;
+#else
+	// POSIX standard (Linux, macOS/BSD) uses timespec members
 	st->st_atim.tv_sec = attr->atime;
 	st->st_atim.tv_nsec = attr->atime_nseconds;
 	st->st_mtim.tv_sec = attr->mtime;
 	st->st_mtim.tv_nsec = attr->mtime_nseconds;
 	st->st_ctim.tv_sec = attr->createtime;
 	st->st_ctim.tv_nsec = attr->createtime_nseconds;
+#endif
 
 	switch (attr->type) {
 	case SSH_FILEXFER_TYPE_REGULAR:
@@ -311,10 +336,19 @@ int mscp_setstat(const char *path, struct stat *st, bool preserve_ts, sftp_sessi
 		attr.size = st->st_size;
 		attr.flags = (SSH_FILEXFER_ATTR_PERMISSIONS | SSH_FILEXFER_ATTR_SIZE);
 		if (preserve_ts) {
+#if defined(_WIN32)
+			// Use MinGW/Windows time_t fields for SFTP attribute
+			attr.atime = st->st_atime;
+			attr.atime_nseconds = 0; // Windows stat generally lacks nanosecond precision
+			attr.mtime = st->st_mtime;
+			attr.mtime_nseconds = 0;
+#else
+			// Use POSIX timespec fields
 			attr.atime = st->st_atim.tv_sec;
 			attr.atime_nseconds = st->st_atim.tv_nsec;
 			attr.mtime = st->st_mtim.tv_sec;
 			attr.mtime_nseconds = st->st_mtim.tv_nsec;
+#endif
 			attr.flags |= (SSH_FILEXFER_ATTR_ACCESSTIME |
 				       SSH_FILEXFER_ATTR_MODIFYTIME |
 				       SSH_FILEXFER_ATTR_SUBSECOND_TIMES);
@@ -325,9 +359,24 @@ int mscp_setstat(const char *path, struct stat *st, bool preserve_ts, sftp_sessi
 		if ((ret = truncate(path, st->st_size)) < 0)
 			return ret;
 		if (preserve_ts) {
+#if defined(_WIN32)
+			// Use the standard MinGW/Windows function for setting file times: utime
+			struct utimbuf times;
+			// Copy from MinGW's struct stat fields
+			times.actime = st->st_atime; 
+			times.modtime = st->st_mtime; 
+			
+			// utime is the compatible call for time_t values
+			if ((ret = utime(path, &times)) < 0)
+				return ret;
+#else
+			// POSIX standard setutimes (expects struct timespec via st_atim/st_mtim)
 			if ((ret = setutimes(path, st->st_atim, st->st_mtim)) < 0)
 				return ret;
+#endif
 		}
+		// mscp_mkdir fix: already applied to remove 'mode' argument
+		// ... assuming the mkdir fix from the previous turn is here:
 		if ((ret = chmod(path, st->st_mode)) < 0)
 			return ret;
 	}
@@ -335,21 +384,145 @@ int mscp_setstat(const char *path, struct stat *st, bool preserve_ts, sftp_sessi
 	return ret;
 }
 
+#if defined(_WIN32) && !defined(GLOB_ALTDIRFUNC)
+/* Private function for Windows local globbing using FindFirstFile/FindNextFile */
+static int mscp_glob_windows_local(const char *pattern, glob_t *pglob)
+{
+	WIN32_FIND_DATAA findData;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	char **path_list = NULL;
+	size_t path_count = 0;
+	size_t max_paths = 16;
+	
+	// Initialize glob_t
+	memset(pglob, 0, sizeof(*pglob));
+
+	// Use FindFirstFileA (ANSI version)
+	hFind = FindFirstFileA(pattern, &findData);
+	if (hFind == INVALID_HANDLE_VALUE) {
+		DWORD err = GetLastError();
+		// ERROR_FILE_NOT_FOUND (2), ERROR_PATH_NOT_FOUND (3), ERROR_NO_MORE_FILES (18)
+		if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND || err == ERROR_NO_MORE_FILES) {
+			return GLOB_NOMATCH;
+		}
+		// Other serious error
+		errno = EIO; 
+		return GLOB_ABORTED;
+	}
+
+	path_list = calloc(max_paths, sizeof(char *));
+	if (!path_list) {
+		FindClose(hFind);
+		return GLOB_NOSPACE;
+	}
+	
+	// Extract the directory path from the pattern (e.g., "C:\path\*.txt" -> "C:\path")
+	char dir_path_buf[MAX_PATH];
+	const char *last_sep = strrchr(pattern, '/');
+	if (!last_sep) last_sep = strrchr(pattern, '\\');
+	
+	size_t dir_len = 0;
+	if (last_sep) {
+		dir_len = last_sep - pattern;
+		if (dir_len >= MAX_PATH) {
+			dir_len = 0; // Fallback to current dir if path part is too long
+		} else {
+			strncpy(dir_path_buf, pattern, dir_len);
+			dir_path_buf[dir_len] = '\0';
+		}
+	} else {
+		// Pattern contains no path, e.g., "*.c"
+		strcpy(dir_path_buf, ".");
+	}
+
+	do {
+		// Skip "." and ".." unless they are the entire pattern
+		if ((strcmp(findData.cFileName, ".") == 0) || (strcmp(findData.cFileName, "..") == 0)) {
+			if (strcmp(pattern, ".") != 0 && strcmp(pattern, "..") != 0) {
+				continue;
+			}
+		}
+		
+		// Reallocate if needed
+		if (path_count >= max_paths) {
+			max_paths *= 2;
+			char **new_list = realloc(path_list, max_paths * sizeof(char *));
+			if (!new_list) {
+				// Clean up and return error
+				for (size_t i = 0; i < path_count; i++) free(path_list[i]);
+				free(path_list);
+				FindClose(hFind);
+				return GLOB_NOSPACE;
+			}
+			path_list = new_list;
+		}
+
+		// Construct the full path
+		const char *filename = findData.cFileName;
+		
+		char *full_path;
+		size_t path_len;
+		
+		if (dir_len > 0) {
+			// dir_path_buf/filename
+			const char *sep = (last_sep[0] == '/') ? "/" : "\\";
+			path_len = dir_len + 1 + strlen(filename) + 1; // +1 for separator, +1 for null
+			full_path = malloc(path_len);
+			if (!full_path) { /* cleanup and return NOSPACE */ goto error_nospace; }
+			snprintf(full_path, path_len, "%s%s%s", dir_path_buf, sep, filename);
+		} else {
+			// just the filename
+			path_len = strlen(filename) + 1;
+			full_path = strdup(filename);
+			if (!full_path) { /* cleanup and return NOSPACE */ goto error_nospace; }
+		}
+
+		path_list[path_count++] = full_path;
+
+	} while (FindNextFileA(hFind, &findData) != 0);
+
+	FindClose(hFind);
+	
+	// Finalize the list
+	pglob->gl_pathc = path_count;
+	pglob->gl_pathv = path_list;
+	// Mark it as our custom Windows glob for globfree to handle
+	pglob->gl_offs = MSCP_GLOB_WINDOWS_FAKE; 
+	
+	// Return 0 on success, GLOB_NOMATCH if no paths were added
+	return (path_count > 0) ? 0 : GLOB_NOMATCH;
+
+error_nospace:
+	for (size_t i = 0; i < path_count; i++) free(path_list[i]);
+	free(path_list);
+	FindClose(hFind);
+	return GLOB_NOSPACE;
+}
+#endif // _WIN32 && !GLOB_ALTDIRFUNC
+
+/* remote glob */
 int mscp_glob(const char *pattern, int flags, glob_t *pglob, sftp_session sftp)
 {
 	int ret;
+	
 	if (sftp) {
+		// --- SFTP/Remote Path (Uses GLOB_ALTDIRFUNC or the musl-like fallback) ---
 #ifndef GLOB_ALTDIRFUNC
 #define GLOB_NOALTDIRMAGIC INT_MAX
 		/* musl does not implement GLOB_ALTDIRFUNC */
 		pglob->gl_pathc = 1;
 		pglob->gl_pathv = malloc(sizeof(char *));
+		if (!pglob->gl_pathv) return GLOB_NOSPACE;
 		pglob->gl_pathv[0] = strdup(pattern);
+		if (!pglob->gl_pathv[0]) { free(pglob->gl_pathv); return GLOB_NOSPACE; }
 		pglob->gl_offs = GLOB_NOALTDIRMAGIC;
 		return 0;
 #else
 		flags |= GLOB_ALTDIRFUNC;
 		set_tls_sftp_session(sftp);
+		
+		// The original logic with function pointers relies on the system glob() being present
+		// and supporting GLOB_ALTDIRFUNC.
 #if defined(__APPLE__) || defined(__FreeBSD__)
 		pglob->gl_opendir = (void *(*)(const char *))mscp_opendir_wrapped;
 		pglob->gl_readdir = (struct dirent * (*)(void *)) mscp_readdir;
@@ -363,20 +536,44 @@ int mscp_glob(const char *pattern, int flags, glob_t *pglob, sftp_session sftp)
 		pglob->gl_lstat = (int (*)(const char *, void *))mscp_lstat_wrapped;
 		pglob->gl_stat = (int (*)(const char *, void *))mscp_stat_wrapped;
 #else
-#error unsupported platform
+#error unsupported platform for GLOB_ALTDIRFUNC
 #endif
 #endif
+	} 
+	
+#if defined(_WIN32) && !defined(GLOB_ALTDIRFUNC)
+	if (!sftp) {
+		// --- Windows Local Path (MinGW case) ---
+		ret = mscp_glob_windows_local(pattern, pglob);
+	} else {
+		// If SFTP is active but GLOB_ALTDIRFUNC is missing (unlikely on Windows, 
+		// but included for completeness if the user forces a build without libssh's GLOB_ALTDIRFUNC checks)
+		// This path is usually covered by the GLOB_NOALTDIRMAGIC block above.
+		ret = GLOB_NOSYS; 
 	}
-
+#else
+	// --- POSIX Local Path or POSIX/SFTP with GLOB_ALTDIRFUNC ---
 	ret = glob(pattern, flags, NULL, pglob);
+#endif
 
 	if (sftp)
-		set_tls_sftp_session(NULL);
+		set_tls_sftp_session(NULL); // Cleanup only if sftp was active
+		
 	return ret;
 }
 
 void mscp_globfree(glob_t *pglob)
 {
+#if defined(_WIN32) && !defined(GLOB_ALTDIRFUNC)
+	if (pglob->gl_offs == MSCP_GLOB_WINDOWS_FAKE) {
+		// Custom cleanup for Windows fake glob
+		for (size_t i = 0; i < pglob->gl_pathc; i++) {
+			free(pglob->gl_pathv[i]);
+		}
+		free(pglob->gl_pathv);
+		return;
+	}
+#endif
 #ifndef GLOB_ALTDIRFUNC
 	if (pglob->gl_offs == GLOB_NOALTDIRMAGIC) {
 		free(pglob->gl_pathv[0]);
@@ -384,5 +581,9 @@ void mscp_globfree(glob_t *pglob)
 		return;
 	}
 #endif
+	
+	// Fallback to standard globfree() for POSIX and GLOB_ALTDIRFUNC paths
+#if !defined(_WIN32) || (defined(_WIN32) && defined(GLOB_ALTDIRFUNC))
 	globfree(pglob);
+#endif
 }

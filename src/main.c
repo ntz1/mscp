@@ -8,10 +8,22 @@
 #include <math.h>
 #include <signal.h>
 #include <sys/time.h>
+
+#if defined(_WIN32)
+// Use Windows API for screen width/networking, and define a simplified winsize
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#else
+// POSIX headers
 #include <sys/ioctl.h>
 #include <poll.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#endif
+
 #include <pthread.h>
 
 #include <mscp.h>
@@ -684,7 +696,6 @@ char *calculate_eta(size_t remain, size_t diff, struct timeval *b, struct timeva
 void print_progress_bar(double percent, char *suffix)
 {
 	int n, thresh, bar_width;
-	struct winsize ws;
 	char buf[128];
 
 	/*
@@ -693,12 +704,36 @@ void print_progress_bar(double percent, char *suffix)
 
 	buf[0] = '\0';
 
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) < 0 || ws.ws_col == 0) {
+#if defined(_WIN32)
+	// MinGW/Windows Implementation for getting console size
+	struct winsize {
+		unsigned short ws_row;
+		unsigned short ws_col;
+	};
+	struct winsize ws;
 
+	// Use Windows API to get console dimensions
+	HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+
+	if (hStdout == INVALID_HANDLE_VALUE || !GetConsoleScreenBufferInfo(hStdout, &csbi)) {
+		// Fallback to default
+		ws.ws_col = 80;
+	} else {
+		// Calculate columns from the visible window area
+		ws.ws_col = csbi.srWindow.Right - csbi.srWindow.Left + 1;
+		if (ws.ws_col == 0) ws.ws_col = 80; // Safety check
+	}
+
+#else
+	// Original POSIX/Unix implementation using ioctl
+	struct winsize ws;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) < 0 || ws.ws_col == 0) {
 		// fallback to default
 		ws.ws_col = 80;
 		ws.ws_row = 24;
 	}
+#endif
 
 	bar_width = min(sizeof(buf), ws.ws_col) - strlen(suffix) - 7;
 

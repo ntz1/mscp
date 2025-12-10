@@ -1,7 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 #include <fcntl.h>
+
+#ifndef _WIN32
 #include <sys/uio.h>
-#include <arpa/inet.h>
+#endif
+// #include <arpa/inet.h>
 
 #include <path.h>
 #include <print.h>

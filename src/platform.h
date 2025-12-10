@@ -8,6 +8,22 @@
 #include <semaphore.h>
 #include <stdint.h>
 
+#if defined(_WIN32)
+// Include winsock headers for network byte order functions on MinGW/Windows.
+#include <winsock2.h> 
+#include <ws2tcpip.h>
+// Prototypes for missing POSIX functions (implemented in platform.c)
+// char *strndup(const char *s, size_t n);
+char *getpass(const char *prompt);
+
+struct iovec
+{
+    void    *iov_base;  /* Base address of a memory region for input or output */
+    size_t   iov_len;   /* The size of the memory pointed to by iov_base */
+};
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
+#endif
+
 int nr_cpus(void);
 int set_thread_affinity(pthread_t tid, int core);
 int setutimes(const char *path, struct timespec atime, struct timespec mtime);

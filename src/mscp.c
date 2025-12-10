@@ -340,7 +340,14 @@ int mscp_set_dst_path(struct mscp *m, const char *dst_path)
 
 static size_t get_page_mask(void)
 {
+#if defined(_WIN32)
+	/* MinGW/Windows typically lacks sysconf(_SC_PAGESIZE). 
+	 * Use a common 4KB page size for alignment purposes as a safe fallback.
+	 */
+	size_t page_sz = 4096;
+#else
 	size_t page_sz = sysconf(_SC_PAGESIZE);
+#endif
 	return ~(page_sz - 1);
 }
 
