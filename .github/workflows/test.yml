@@ -6,12 +6,18 @@ on:
 jobs:
   test:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd        
     steps:
+      - uses: msys2/setup-msys2@v2
+
       - name: Test
-        shell: cmd
         run: |
-          dir C:\msys64\usr\bin
-          where msys2bash
+          dir C:\msys64\usr\include
+          where msys2
+          msys2 -c 'uname -a'
+
 
 
 
