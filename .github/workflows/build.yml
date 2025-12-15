@@ -214,8 +214,8 @@ jobs:
             -DZLIB_ROOT_DIR=$TARGET_DIR \
             -DOPENSSL_ROOT_DIR=$TARGET_DIR \
             -DCMAKE_C_FLAGS="-DLIBSSH_STATIC"\
-            -DWITH_GSSAPI=OFF \
-            -DWITH_SFTP_FALLBACK=OFF \
+            # -DWITH_GSSAPI=OFF \
+            # -DWITH_SFTP_FALLBACK=OFF \
             # -DWITH_POLL=OFF
             # -DZLIB_LIBRARY=$TARGET_DIR/lib/libz.a \
             # -DZLIB_INCLUDE_DIR=$TARGET_DIR/include \
