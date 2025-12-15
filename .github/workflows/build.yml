@@ -129,6 +129,7 @@ jobs:
 
           mkdir -p $GITHUB_WORKSPACE/deps
           echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
+          echo "BUILD_DIR=$GITHUB_WORKSPACE/build" >> $GITHUB_ENV
 
           if [ "${{ matrix.system }}" = "Darwin" ]; then
             echo "NPROC=$(sysctl -n hw.ncpu)" >> $GITHUB_ENV
@@ -216,15 +217,15 @@ jobs:
           make -j$($NPROC)
 
           echo "Checking for mscp..."
-          MSCP=$GITHUB_WORKSPACE/build/mscp${{ matrix.suffix }}
-          ls -l $MSCP
-          $MSCP -v
+          BIN=$BUILD_DIR/mscp${{ matrix.suffix }}
+          ls -l $BIN
+          $BIN -v
           if [ "${{ matrix.system }}" = "Darwin" ]; then
-            otool -L $MSCP
-            echo "$(otool -L $MSCP | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')" > $MSCP_DYN
+            otool -L $BIN
+            echo "$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')" > $BIN_DYN
           else
-            ldd $MSCP
-            echo ",$(ldd $MSCP | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $MSCP_DYN
+            ldd $BIN
+            echo ",$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $BIN_DYN
           fi
 
       # ==========================================================
@@ -234,4 +235,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mscp-${{ matrix.name }}
-          path: $MSCP$MSCP_DYN
+          path: $BIN$BIN_DYN
