@@ -10,6 +10,7 @@ on:
         options:
           - linux-x86_64
           - linux-aarch64
+          - darwin-aarch64
           - windows-x86_64
           - all
 
@@ -29,6 +30,8 @@ jobs:
           BUILDS='[
             {
               "name": "linux-x86_64",
+              "os": "ubuntu-latest",
+              "shell": "bash",
               "system": "Linux",
               "toolchain": "musl",
               "arch": "x86_64",
@@ -36,19 +39,32 @@ jobs:
             },
             {
               "name": "linux-aarch64",
+              "os": "ubuntu-latest",
+              "shell": "bash",
               "system": "Linux",
               "toolchain": "musl",
               "arch": "aarch64",
               "suffix": ""
+            },
+            {
+              "name": "darwin-aarch64",
+              "os": "macos-latest",
+              "shell": "bash",
+              "system": "Darwin",
+              "toolchain": "clang",
+              "arch": "aarch64",
+              "suffix": ""
+            },
+            {
+              "name": "windows-x86_64",
+              "os": "windows-latest",
+              "shell": "C:\msys64\usr\bin\bash.exe {0}",
+              "system": "Windows",
+              "toolchain": "msys2",
+              "arch": "x86_64",
+              "suffix": ".exe"
             }
           ]'
-            # {
-            #   "name": "windows-x86_64",
-            #   "system": "Windows",
-            #   "toolchain": "mingw",
-            #   "arch": "x86_64",
-            #   "suffix": ".exe"
-            # }
 
           FILTERED_BUILDS=$(echo "$BUILDS" | jq -c '[.[] | select(
               (env.TARGETS == "all") or (env.TARGETS == .name)
@@ -58,8 +74,11 @@ jobs:
 
   build:
     name: Build ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: define_matrix
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     strategy:
       fail-fast: false
@@ -69,21 +88,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      # - name: Configure Fast APT Mirror
-      #   uses: vegardit/fast-apt-mirror.sh@v1
-
-      # # ==========================================================
-      # # SETUP TOOLCHAINS
-      # # ==========================================================
-      # - name: Setup MinGW
-      #   if: matrix.toolchain == 'mingw'
-      #   run: |
-      #     sudo apt-get install -y gcc-mingw-w64-x86-64-posix
-
-      #     echo "CC=x86_64-w64-mingw32-gcc-posix" >> $GITHUB_ENV
-      #     echo "WINDRES=x86_64-w64-mingw32-windres" >> $GITHUB_ENV
+          submodules: true
 
       - name: Setup Musl
         if: matrix.toolchain == 'musl'
@@ -100,10 +105,13 @@ jobs:
 
           echo "CC=$TOOLCHAIN_ROOT/bin/$MUSL_TARGET-gcc" >> $GITHUB_ENV
 
-      - name: Setup Root Path
+      - name: Setup Environment
         run: |
-          echo "TARGET_DIR=${{ github.workspace }}/deps" >> $GITHUB_ENV
           mkdir -p ${{ github.workspace }}/deps
+          echo "TARGET_DIR=${{ github.workspace }}/deps" >> $GITHUB_ENV
+
+          if [ "${{ matrix.system }}" = "Darwin" ]; then
+            alias nproc="sysctl -n hw.ncpu"
 
       # ==========================================================
       # DEPENDENCIES
@@ -129,11 +137,9 @@ jobs:
           tar -xzf $OPENSSL_VER.tar.gz
           cd $OPENSSL_VER
 
-          # if [ "${{ matrix.toolchain }}" = "mingw" ]; then
-          #    SSL_TARGET="mingw64"
-          # else
+          if [ "${{ matrix.toolchain }}" = "musl" ]; then
              SSL_TARGET=${{ matrix.name }}
-          # fi
+          fi
 
           ./Configure $SSL_TARGET no-shared --prefix=$TARGET_DIR --libdir=lib
           make -j$(nproc) && make install_sw
@@ -147,7 +153,6 @@ jobs:
       # ==========================================================
       - name: Patch libssh
         run: |
-          git submodule update --init
           patch -d libssh -p1 < patch/$(git -C libssh describe --tags).patch
 
       # ==========================================================
@@ -157,18 +162,20 @@ jobs:
         run: |
           mkdir build && cd build
 
-          TOOLCHAIN_FILE=${{ matrix.toolchain }}.cmake
-          cat <<EOF > $TOOLCHAIN_FILE
-          set(CMAKE_SYSTEM_NAME ${{ matrix.system }})
-          set(CMAKE_C_COMPILER "$CC")
-          set(CMAKE_CXX_COMPILER "$CXX")
-          set(CMAKE_FIND_ROOT_PATH "$TARGET_DIR")
-          set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-          set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-          set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-          set(BUILD_SHARED_LIBS OFF)
-          set(CMAKE_EXE_LINKER_FLAGS "-static -static-libgcc")
-          EOF
+          if [ "${{ matrix.toolchain }}" = "musl" ]; then
+            TOOLCHAIN_FILE=${{ matrix.toolchain }}.cmake
+            cat <<EOF > $TOOLCHAIN_FILE
+            set(CMAKE_SYSTEM_NAME ${{ matrix.system }})
+            set(CMAKE_C_COMPILER "$CC")
+            set(CMAKE_CXX_COMPILER "$CXX")
+            set(CMAKE_FIND_ROOT_PATH "$TARGET_DIR")
+            set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+            set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+            set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+            set(BUILD_SHARED_LIBS OFF)
+            set(CMAKE_EXE_LINKER_FLAGS "-static")
+            EOF
+          fi
 
           cmake .. \
             -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN_FILE \
@@ -182,6 +189,16 @@ jobs:
 
           make -j$(nproc)
 
+          echo "Checking for mscp..."
+          MSCP=build/mscp${{ matrix.suffix }}
+          ls -l $MSCP
+          $MSCP -v
+          ldd $MSCP
+          echo ,$(ldd $MSCP \
+            | awk '{print $3}' \
+            | grep 'msys-.*\.dll' \
+            | paste -sd,) > $MSCP_DYN
+
       # ==========================================================
       # ARTIFACTS
       # ==========================================================
@@ -189,4 +206,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mscp-${{ matrix.name }}
-          path: build/mscp${{ matrix.suffix }}
+          path: $MSCP$MSCP_DYN
