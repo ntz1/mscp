@@ -99,13 +99,15 @@ jobs:
             git
             patch
 
-      - run: git config --global core.autocrlf input
+      - run: |
+          git config --global core.autocrlf input
+          GITHUB_WORKSPACE="${{ github.workspace }}"
       - uses: actions/checkout@v4
         with:
           submodules: true
 
-      - name: Setup Musl
-        if: matrix.toolchain == 'musl'
+      - name: Setup Environment (Linux)
+        if: matrix.system == 'Linux'
         run: |
           MUSL_TARGET="${{ matrix.arch }}-unknown-linux-musl"
           URL="https://github.com/cross-tools/musl-cross/releases/latest/download/$MUSL_TARGET.tar.xz"
@@ -119,22 +121,21 @@ jobs:
 
           echo "CC=$TOOLCHAIN_ROOT/bin/$MUSL_TARGET-gcc" >> $GITHUB_ENV
 
-      - name: Setup Environment
+      - name: Setup Environment (Darwin)
+        if: matrix.system == 'Darwin'
         run: |
-          GITHUB_WORKSPACE="${{ github.workspace }}"
+          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
+          echo "NPROC=$(sysctl -n hw.ncpu)" >> $GITHUB_ENV
 
-          if [ "${{ matrix.system }}" = "Windows" ]; then
-            GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
-            gCC --version
-          fi
+      - name: Setup Environment (Windows)
+        if: matrix.system == 'Windows'
+        run: |
+          GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
 
+      - run: |
           mkdir -p $GITHUB_WORKSPACE/deps
           echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
           echo "BUILD_DIR=$GITHUB_WORKSPACE/build" >> $GITHUB_ENV
-
-          if [ "${{ matrix.system }}" = "Darwin" ]; then
-            echo "NPROC=$(sysctl -n hw.ncpu)" >> $GITHUB_ENV
-          fi
 
       # ==========================================================
       # DEPENDENCIES
@@ -222,10 +223,10 @@ jobs:
           ls -l $BIN
           if [ "${{ matrix.system }}" = "Darwin" ]; then
             otool -L $BIN
-            echo "$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')" > $BIN_DYN
+            BIN_DYN="$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')"
           else
             ldd $BIN
-            echo ",$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $BIN_DYN
+            BIN_DYN=",$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)"
           fi
 
       # ==========================================================
