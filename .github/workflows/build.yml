@@ -107,6 +107,8 @@ jobs:
 
       - name: Setup Environment
         run: |
+          echo "CFLAGS=\"-O2\"" >> $GITHUB_ENV
+
           GITHUB_WORKSPACE="${{ github.workspace }}"
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
@@ -203,7 +205,9 @@ jobs:
           ls -l $MSCP
           $MSCP -v
           ldd $MSCP
-          echo ",$(ldd $MSCP | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $MSCP_DYN
+          if [ "${{ matrix.toolchain }}" = "msys2" ]; then
+            echo ",$(ldd $MSCP | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $MSCP_DYN
+          fi
 
       # ==========================================================
       # ARTIFACTS
