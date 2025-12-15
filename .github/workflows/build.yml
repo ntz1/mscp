@@ -118,10 +118,11 @@ jobs:
       - name: Setup Environment
         run: |
           GITHUB_WORKSPACE="${{ github.workspace }}"
-          $CC --version
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
+            echo "CC=$MINGW_PACKAGE_PREFIX-gcc" >> $GITHUB_ENV
+            echo $CC
           fi
 
           mkdir -p $GITHUB_WORKSPACE/deps
