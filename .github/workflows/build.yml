@@ -58,7 +58,7 @@ jobs:
             {
               "name": "windows-x86_64",
               "os": "windows-latest",
-              "shell": "C:\\msys64\\usr\\bin\\bash.exe -l {0}",
+              "shell": "msys2 {0}",
               "system": "Windows",
               "toolchain": "msys2",
               "arch": "x86_64",
@@ -86,9 +86,16 @@ jobs:
         include: ${{ fromJson(needs.define_matrix.outputs.matrix_config) }}
 
     steps:
+      - run: git config --global core.autocrlf input
       - uses: actions/checkout@v4
         with:
           submodules: true
+
+      - uses: msys2/setup-msys2@v2
+        if: matrix.toolchain == 'msys2'
+        with:
+          msystem: MINGW64
+          path-type: strict
 
       - name: Setup Musl
         if: matrix.toolchain == 'musl'
@@ -111,9 +118,6 @@ jobs:
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
-            MSYSTEM=MINGW64 >> $GITHUB_ENV
-            pacman -Sy --noconfirm mingw-w64-x86_64-toolchain
-            gcc --version
           fi
 
           mkdir -p $GITHUB_WORKSPACE/deps
