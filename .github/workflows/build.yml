@@ -118,8 +118,7 @@ jobs:
       - name: Setup Environment
         run: |
           GITHUB_WORKSPACE="${{ github.workspace }}"
-          echo $GITHUB_WORKSPACE
-          gcc --version
+          $CC --version
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
@@ -129,7 +128,7 @@ jobs:
           echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
 
           if [ "${{ matrix.system }}" = "Darwin" ]; then
-            alias nproc="sysctl -n hw.ncpu"
+            echo "NPROC=\"sysctl -n hw.ncpu\"" >> $GITHUB_ENV
           fi
 
       # ==========================================================
@@ -143,7 +142,7 @@ jobs:
           cd $ZLIB_VER
 
           ./configure --prefix=$TARGET_DIR --static
-          make -j$(nproc) && make install
+          make -j$($NPROC) && make install
 
           echo "Checking for zlib..."
           ls -l $TARGET_DIR/lib/libz.a
@@ -161,7 +160,7 @@ jobs:
           fi
 
           ./Configure $SSL_TARGET no-shared --prefix=$TARGET_DIR --libdir=lib
-          make -j$(nproc) && make install_sw
+          make -j$($NPROC) && make install_sw
 
           echo "Checking for openssl..."
           ls -l $TARGET_DIR/lib/libcrypto.a
@@ -211,11 +210,11 @@ jobs:
             -DOPENSSL_CRYPTO_LIBRARY=$TARGET_DIR/lib/libcrypto.a \
             -DOPENSSL_INCLUDE_DIR=$TARGET_DIR/include
 
-          make -j$(nproc)
+          make -j$($NPROC)
 
-          echo "Checking for mscp..."
-          MSCP=build/mscp${{ matrix.suffix }}
-          ls -l $MSCP
+          # echo "Checking for mscp..."
+          # MSCP=./build/mscp${{ matrix.suffix }}
+          # ls -l $MSCP
           # $MSCP -v
           # ldd $MSCP
           # if [ "${{ matrix.toolchain }}" = "msys2" ]; then
@@ -229,4 +228,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mscp-${{ matrix.name }}
-          path: $MSCP$MSCP_DYN
+          path: build
