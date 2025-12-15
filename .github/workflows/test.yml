@@ -8,7 +8,7 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        shell: cmd        
+        shell: C:\msys64\usr\bin\bash.exe
     steps:
       - run: |
-          where bash
+          uname -a
