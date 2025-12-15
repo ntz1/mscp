@@ -6,12 +6,13 @@ on:
 jobs:
   test:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash        
+    # defaults:
+    #   run:
+    #     shell: bash        
     steps:
       - run: |
-          uname -a
+          Get-ChildItem Env:
+
 
 
 
