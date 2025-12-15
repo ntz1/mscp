@@ -107,11 +107,18 @@ jobs:
 
       - name: Setup Environment
         run: |
-          mkdir -p ${{ github.workspace }}/deps
-          echo "TARGET_DIR=${{ github.workspace }}/deps" >> $GITHUB_ENV
+          GITHUB_WORKSPACE=${{ github.workspace }}
+
+          if [ "${{ matrix.system }}" = "Windows" ]; then
+            GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
+          fi
+
+          mkdir -p $GITHUB_WORKSPACE/deps
+          echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
 
           if [ "${{ matrix.system }}" = "Darwin" ]; then
             alias nproc="sysctl -n hw.ncpu"
+          fi
 
       # ==========================================================
       # DEPENDENCIES
