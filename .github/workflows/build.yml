@@ -91,7 +91,9 @@ jobs:
         with:
           msystem: MINGW64
           path-type: strict
+          update: true
           install: >-
+            mingw-w64-x86_64-toolchain
             git
             patch
 
@@ -121,15 +123,14 @@ jobs:
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
-            echo "CC=$MINGW_PACKAGE_PREFIX-gcc" >> $GITHUB_ENV
-            echo $CC
+            gCC --version
           fi
 
           mkdir -p $GITHUB_WORKSPACE/deps
           echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
 
           if [ "${{ matrix.system }}" = "Darwin" ]; then
-            echo "NPROC=\"sysctl -n hw.ncpu\"" >> $GITHUB_ENV
+            echo "NPROC=$(sysctl -n hw.ncpu)" >> $GITHUB_ENV
           fi
 
       # ==========================================================
@@ -213,14 +214,17 @@ jobs:
 
           make -j$($NPROC)
 
-          # echo "Checking for mscp..."
-          # MSCP=./build/mscp${{ matrix.suffix }}
-          # ls -l $MSCP
-          # $MSCP -v
-          # ldd $MSCP
-          # if [ "${{ matrix.toolchain }}" = "msys2" ]; then
-          #   echo ",$(ldd $MSCP | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $MSCP_DYN
-          # fi
+          echo "Checking for mscp..."
+          MSCP=$TARGET_DIR/build/mscp${{ matrix.suffix }}
+          ls -l $MSCP
+          $MSCP -v
+          if [ "${{ matrix.system }}" = "Darwin" ]; then
+            otool -L $MSCP
+            echo "$(otool -L $MSCP | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')" > $MSCP_DYN
+          else
+            ldd $MSCP
+            echo ",$(ldd $MSCP | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $MSCP_DYN
+          fi
 
       # ==========================================================
       # ARTIFACTS
@@ -229,4 +233,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mscp-${{ matrix.name }}
-          path: build
+          path: $MSCP$MSCP_DYN
