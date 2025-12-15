@@ -8,10 +8,11 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        shell: wslbash        
+        shell: bash        
     steps:
       - run: |
           uname -a
+
 
 
 
