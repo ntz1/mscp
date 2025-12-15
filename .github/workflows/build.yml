@@ -203,16 +203,12 @@ jobs:
           # fi
 
           if [ "${{ matrix.system }}" != "Darwin" ]; then
-            CMAKE_EXE_LINKER_FLAGS="-static -static-libgcc"
+            CMAKE_ARGS="-DCMAKE_EXE_LINKER_FLAGS=\"-static -static-libgcc\""
           fi
 
           cmake .. \
             -G "Unix Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_FIND_ROOT_PATH="$TARGET_DIR" \
-            -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
-            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_PREFIX_PATH=$TARGET_DIR \
             -DZLIB_ROOT_DIR=$TARGET_DIR \
@@ -220,6 +216,7 @@ jobs:
             -DCMAKE_C_FLAGS="-DLIBSSH_STATIC"\
             -DWITH_GSSAPI=OFF \
             -DWITH_SFTP_FALLBACK=OFF \
+            $CMAKE_ARGS
             # -DWITH_POLL=OFF
             # -DZLIB_LIBRARY=$TARGET_DIR/lib/libz.a \
             # -DZLIB_INCLUDE_DIR=$TARGET_DIR/include \
