@@ -111,15 +111,11 @@ jobs:
         if: matrix.system == 'Linux'
         run: |
           MUSL_TARGET="${{ matrix.arch }}-unknown-linux-musl"
-          URL="https://github.com/cross-tools/musl-cross/releases/latest/download/$MUSL_TARGET.tar.xz"
-
-          wget -q $URL
-
+          wget -q https://github.com/cross-tools/musl-cross/releases/latest/download/$MUSL_TARGET.tar.xz
           sudo mkdir -p /opt/musl-cross
           sudo tar -xf $MUSL_TARGET.tar.xz -C /opt/musl-cross
 
           TOOLCHAIN_ROOT="/opt/musl-cross/$MUSL_TARGET"
-
           echo "CC=$TOOLCHAIN_ROOT/bin/$MUSL_TARGET-gcc" >> $GITHUB_ENV
 
       - name: Setup Environment (Darwin)
@@ -131,8 +127,8 @@ jobs:
       - name: Setup Environment (Windows)
         if: matrix.system == 'Windows'
         run: |
-          GW=$(cygpath -u "$GITHUB_WORKSPACE")
-          echo "GITHUB_WORKSPACE=$GW" >> $GITHUB_ENV
+          echo "GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
+          echo "$GITHUB_WORKSPACE"
 
       - run: |
           mkdir -p $GITHUB_WORKSPACE/deps
@@ -221,15 +217,15 @@ jobs:
 
           echo "Checking for mscp..."
           BIN=mscp${{ matrix.suffix }}
-          echo "$BIN" >> $GITHUB_ENV
           ls -l $BIN
           if [ "${{ matrix.system }}" = "Darwin" ]; then
             otool -L $BIN
-            echo "BIN_DYN=$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')" >> $GITHUB_ENV
+            echo "BIN_DYN=$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf "%s", $1}')" >> $GITHUB_ENV
           else
             ldd $BIN
-            echo "BIN_DYN=,$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" >> $GITHUB_ENV
-          fi
+            echo "BIN_DYN=$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" >> $GITHUB_ENV
+          fi          
+          echo "$BIN" >> $GITHUB_ENV
 
       # ==========================================================
       # ARTIFACTS
@@ -238,4 +234,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mscp-${{ matrix.name }}
-          path: build/$BIN$BIN_DYN
+          path: |
+            build/$BIN
+            $BIN_DYN
+          compression-level: 0
