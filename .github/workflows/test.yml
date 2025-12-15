@@ -10,7 +10,8 @@ jobs:
       - name: Test
         shell: cmd
         run: |
-          dir C:\msys64
+          dir C:\msys64\usr\bin
           where msys2bash
+
 
 
