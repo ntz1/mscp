@@ -8,8 +8,9 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        shell: C:\msys64\usr\bin\bash.exe {0}
+        shell: C:\shells\msys2bash {0}
     steps:
       - run: |
           uname -a
+
 
