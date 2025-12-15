@@ -54,17 +54,17 @@ jobs:
               "toolchain": "clang",
               "arch": "aarch64",
               "suffix": ""
-            },
-            {
-              "name": "windows-x86_64",
-              "os": "windows-latest",
-              "shell": "msys2 {0}",
-              "system": "Windows",
-              "toolchain": "msys2",
-              "arch": "x86_64",
-              "suffix": ".exe"
             }
           ]'
+            # {
+            #   "name": "windows-x86_64",
+            #   "os": "windows-latest",
+            #   "shell": "msys2 {0}",
+            #   "system": "Windows",
+            #   "toolchain": "msys2",
+            #   "arch": "x86_64",
+            #   "suffix": ".exe"
+            # }
 
           FILTERED_BUILDS=$(echo "$BUILDS" | jq -c '[.[] | select(
               (env.TARGETS == "all") or (env.TARGETS == .name)
