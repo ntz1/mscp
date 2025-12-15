@@ -58,7 +58,7 @@ jobs:
             {
               "name": "windows-x86_64",
               "os": "windows-latest",
-              "shell": "C:\msys64\usr\bin\bash.exe {0}",
+              "shell": "C:\\msys64\\usr\\bin\\bash.exe {0}",
               "system": "Windows",
               "toolchain": "msys2",
               "arch": "x86_64",
