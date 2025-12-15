@@ -203,10 +203,7 @@ jobs:
           ls -l $MSCP
           $MSCP -v
           ldd $MSCP
-          echo ,$(ldd $MSCP \
-            | awk '{print $3}' \
-            | grep 'msys-.*\.dll' \
-            | paste -sd,) > $MSCP_DYN
+          echo ",$(ldd $MSCP | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $MSCP_DYN
 
       # ==========================================================
       # ARTIFACTS
