@@ -216,7 +216,7 @@ jobs:
           make -j$($NPROC)
 
           echo "Checking for mscp..."
-          MSCP=$TARGET_DIR/build/mscp${{ matrix.suffix }}
+          MSCP=$GITHUB_WORKSPACE/build/mscp${{ matrix.suffix }}
           ls -l $MSCP
           $MSCP -v
           if [ "${{ matrix.system }}" = "Darwin" ]; then
