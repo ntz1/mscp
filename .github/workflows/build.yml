@@ -58,7 +58,7 @@ jobs:
             {
               "name": "windows-x86_64",
               "os": "windows-latest",
-              "shell": "C:\\msys64\\usr\\bin\\mingw64.exe -l {0}",
+              "shell": "C:\\msys64\\usr\\bin\\bash.exe -l {0}",
               "system": "Windows",
               "toolchain": "msys2",
               "arch": "x86_64",
@@ -111,6 +111,9 @@ jobs:
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
+            MSYSTEM=MINGW64 >> $GITHUB_ENV
+            gcc --version
+            fsff
           fi
 
           mkdir -p $GITHUB_WORKSPACE/deps
@@ -190,8 +193,8 @@ jobs:
             -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
             -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
             -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
-            -DBUILD_SHARED_LIBS=OFF
-            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc"
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc" \
             -DCMAKE_PREFIX_PATH=$TARGET_DIR \
             -DOPENSSL_USE_STATIC_LIBS=TRUE \
             -DZLIB_LIBRARY=$TARGET_DIR/lib/libz.a \
