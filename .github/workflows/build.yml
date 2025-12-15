@@ -91,6 +91,7 @@ jobs:
         with:
           msystem: MINGW64
           path-type: strict
+          cache: false
           update: true
           install: >-
             mingw-w64-x86_64-toolchain
