@@ -10,10 +10,12 @@ jobs:
       run:
         shell: cmd        
     steps:
-      - name: Test
-        run: |
-          dir C:\msys64\
-          C:\msys64\usr\bin\bash.exe -c 'uname -a'
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: msys64
+          path: C:\msys64\
+
 
 
 
