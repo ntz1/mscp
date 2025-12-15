@@ -101,7 +101,7 @@ jobs:
 
       - run: |
           git config --global core.autocrlf input
-          GITHUB_WORKSPACE="${{ github.workspace }}"
+          echo "GITHUB_WORKSPACE=${{ github.workspace }}" >> $GITHUB_ENV
       - uses: actions/checkout@v4
         with:
           submodules: true
@@ -130,7 +130,7 @@ jobs:
       - name: Setup Environment (Windows)
         if: matrix.system == 'Windows'
         run: |
-          GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
+          echo "GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
 
       - run: |
           mkdir -p $GITHUB_WORKSPACE/deps
