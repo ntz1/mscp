@@ -6,13 +6,13 @@ on:
 jobs:
   test:
     runs-on: windows-latest
-    # defaults:
-    #   run:
-    #     shell: cmd        
+    defaults:
+      run:
+        shell: wslbash        
     steps:
       - run: |
-          $env:Path
-          dir c:\shells
+          uname -a
+
 
 
 
