@@ -106,11 +106,6 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup Environment (Windows)
-        if: matrix.system == 'Windows'
-        run: |
-          echo "CHANGE_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
-
       - name: Setup Environment (Linux)
         if: matrix.system == 'Linux'
         run: |
@@ -128,7 +123,13 @@ jobs:
           echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
           echo "NPROC=$(sysctl -n hw.ncpu)" >> $GITHUB_ENV
 
-      - run: |
+      - name: Setup Environment (Windows)
+        if: matrix.system == 'Windows'
+        run: |
+          echo "CHANGE_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
+
+      - name: Setup Workspace
+        run: |
           GITHUB_WORKSPACE=$GITHUB_WORKSPACE
           if [ -n "$CHANGE_WORKSPACE" ]; then
             GITHUB_WORKSPACE=$CHANGE_WORKSPACE
@@ -202,7 +203,7 @@ jobs:
           # fi
 
           if [ "${{ matrix.system }}" != "Darwin" ]; then
-            CMAKE_EXE_LINKER_FLAGS="-static"
+            CMAKE_EXE_LINKER_FLAGS="-static -static-libgcc"
           fi
 
           cmake .. \
