@@ -128,8 +128,10 @@ jobs:
         run: |
           echo "GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
 
-      - name: Prepare Workspace
-        run: |
+      - run: |
+          :
+
+      - run: |
           mkdir -p $GITHUB_WORKSPACE/deps
           echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
 
@@ -218,10 +220,10 @@ jobs:
           BIN=mscp${{ matrix.suffix }}
           ls -l $BIN
           if [ "${{ matrix.system }}" = "Darwin" ]; then
-            otool -L $BIN
+            otool -L $BIN || true
             echo "BIN_DYN=$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf "%s", $1}')" >> $GITHUB_ENV
           else
-            ldd $BIN
+            ldd $BIN || true
             echo "BIN_DYN=$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" >> $GITHUB_ENV
           fi          
           echo "BIN=$BIN" >> $GITHUB_ENV
