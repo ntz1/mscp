@@ -91,6 +91,9 @@ jobs:
         with:
           msystem: MINGW64
           path-type: strict
+          install: >-
+            git
+            patch
 
       - run: git config --global core.autocrlf input
       - uses: actions/checkout@v4
@@ -116,6 +119,7 @@ jobs:
         run: |
           GITHUB_WORKSPACE="${{ github.workspace }}"
           echo $GITHUB_WORKSPACE
+          gcc --version
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
