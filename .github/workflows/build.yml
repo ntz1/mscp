@@ -95,6 +95,7 @@ jobs:
           install: >-
             mingw-w64-x86_64-toolchain
             make
+            cmake
             git
             patch
 
@@ -219,7 +220,6 @@ jobs:
           echo "Checking for mscp..."
           BIN=$BUILD_DIR/mscp${{ matrix.suffix }}
           ls -l $BIN
-          $BIN -v
           if [ "${{ matrix.system }}" = "Darwin" ]; then
             otool -L $BIN
             echo "$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')" > $BIN_DYN
