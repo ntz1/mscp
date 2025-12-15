@@ -112,8 +112,8 @@ jobs:
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
             MSYSTEM=MINGW64 >> $GITHUB_ENV
+            pacman -Sy --noconfirm mingw-w64-x86_64-toolchain
             gcc --version
-            fsff
           fi
 
           mkdir -p $GITHUB_WORKSPACE/deps
