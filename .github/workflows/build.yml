@@ -58,7 +58,7 @@ jobs:
             {
               "name": "windows-x86_64",
               "os": "windows-latest",
-              "shell": "C:\\msys64\\usr\\bin\\bash.exe {0}",
+              "shell": "C:\\msys64\\usr\\bin\\bash.exe -l {0}",
               "system": "Windows",
               "toolchain": "msys2",
               "arch": "x86_64",
@@ -111,6 +111,7 @@ jobs:
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
+            echo $GITHUB_WORKSPACE
           fi
 
           mkdir -p $GITHUB_WORKSPACE/deps
@@ -160,6 +161,7 @@ jobs:
       # ==========================================================
       - name: Patch libssh
         run: |
+          git -C libssh fetch --all --tags --prune
           patch -d libssh -p1 < patch/$(git -C libssh describe --tags).patch
 
       # ==========================================================
