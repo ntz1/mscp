@@ -6,21 +6,9 @@ on:
 jobs:
   test:
     runs-on: windows-latest
-    # defaults:
-    #   run:
-    #     shell: bash        
+    defaults:
+      run:
+        shell: cmd        
     steps:
       - run: |
-          Get-ChildItem Env:
-
-
-
-
-
-
-
-
-
-
-
-
+          where bash
