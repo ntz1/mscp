@@ -58,7 +58,7 @@ jobs:
             {
               "name": "windows-x86_64",
               "os": "windows-latest",
-              "shell": "C:\\msys64\\usr\\bin\\bash.exe -l {0}",
+              "shell": "C:\\msys64\\usr\\bin\\mingw64.exe -l {0}",
               "system": "Windows",
               "toolchain": "msys2",
               "arch": "x86_64",
@@ -107,13 +107,10 @@ jobs:
 
       - name: Setup Environment
         run: |
-          echo "CFLAGS=\"-O3\"" >> $GITHUB_ENV
-
           GITHUB_WORKSPACE="${{ github.workspace }}"
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
-            echo $GITHUB_WORKSPACE
           fi
 
           mkdir -p $GITHUB_WORKSPACE/deps
@@ -173,23 +170,28 @@ jobs:
         run: |
           mkdir build && cd build
 
-          if [ "${{ matrix.toolchain }}" = "musl" ]; then
-            TOOLCHAIN_FILE=${{ matrix.toolchain }}.cmake
-            cat <<EOF > $TOOLCHAIN_FILE
-            set(CMAKE_SYSTEM_NAME ${{ matrix.system }})
-            set(CMAKE_C_COMPILER "$CC")
-            set(CMAKE_CXX_COMPILER "$CXX")
-            set(CMAKE_FIND_ROOT_PATH "$TARGET_DIR")
-            set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-            set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-            set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-            set(BUILD_SHARED_LIBS OFF)
-            set(CMAKE_EXE_LINKER_FLAGS "-static")
-            EOF
-          fi
+          # if [ "${{ matrix.toolchain }}" = "musl" ]; then
+          #   TOOLCHAIN_FILE=${{ matrix.toolchain }}.cmake
+          #   cat <<EOF > $TOOLCHAIN_FILE
+          #   set(CMAKE_SYSTEM_NAME ${{ matrix.system }})
+          #   set(CMAKE_C_COMPILER "$CC")
+          #   set(CMAKE_CXX_COMPILER "$CXX")
+          #   set(CMAKE_FIND_ROOT_PATH "$TARGET_DIR")
+          #   set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+          #   set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+          #   set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+          #   set(BUILD_SHARED_LIBS OFF)
+          #   set(CMAKE_EXE_LINKER_FLAGS "-static")
+          #   EOF
+          # fi
 
           cmake .. \
-            -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN_FILE \
+            -DCMAKE_FIND_ROOT_PATH=$TARGET_DIR \
+            -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
+            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
+            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+            -DBUILD_SHARED_LIBS=OFF
+            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc"
             -DCMAKE_PREFIX_PATH=$TARGET_DIR \
             -DOPENSSL_USE_STATIC_LIBS=TRUE \
             -DZLIB_LIBRARY=$TARGET_DIR/lib/libz.a \
@@ -203,11 +205,11 @@ jobs:
           echo "Checking for mscp..."
           MSCP=build/mscp${{ matrix.suffix }}
           ls -l $MSCP
-          $MSCP -v
-          ldd $MSCP
-          if [ "${{ matrix.toolchain }}" = "msys2" ]; then
-            echo ",$(ldd $MSCP | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $MSCP_DYN
-          fi
+          # $MSCP -v
+          # ldd $MSCP
+          # if [ "${{ matrix.toolchain }}" = "msys2" ]; then
+          #   echo ",$(ldd $MSCP | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" > $MSCP_DYN
+          # fi
 
       # ==========================================================
       # ARTIFACTS
