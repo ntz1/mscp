@@ -107,7 +107,7 @@ jobs:
 
       - name: Setup Environment
         run: |
-          echo "CFLAGS=\"-O4\"" >> $GITHUB_ENV
+          echo "CFLAGS=\"-O1\"" >> $GITHUB_ENV
 
           GITHUB_WORKSPACE="${{ github.workspace }}"
 
