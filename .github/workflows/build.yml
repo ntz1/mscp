@@ -106,6 +106,11 @@ jobs:
         with:
           submodules: true
 
+      - name: Setup Environment (Windows)
+        if: matrix.system == 'Windows'
+        run: |
+          echo "CHANGE_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
+
       - name: Setup Environment (Linux)
         if: matrix.system == 'Linux'
         run: |
@@ -123,15 +128,11 @@ jobs:
           echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> $GITHUB_ENV
           echo "NPROC=$(sysctl -n hw.ncpu)" >> $GITHUB_ENV
 
-      - name: Setup Environment (Windows)
-        if: matrix.system == 'Windows'
-        run: |
-          echo "GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
-
       - run: |
-          :
-
-      - run: |
+          GITHUB_WORKSPACE=$GITHUB_WORKSPACE
+          if [ -n "$CHANGE_WORKSPACE" ]; then
+            GITHUB_WORKSPACE=$CHANGE_WORKSPACE
+          fi
           mkdir -p $GITHUB_WORKSPACE/deps
           echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
 
@@ -200,6 +201,10 @@ jobs:
           #   EOF
           # fi
 
+          if [ "${{ matrix.system }}" != "Darwin" ]; then
+            CMAKE_EXE_LINKER_FLAGS="-static"
+          fi
+
           cmake .. \
             -G "Unix Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
@@ -220,16 +225,15 @@ jobs:
           make -j$($NPROC)
 
           echo "Checking for mscp..."
-          BIN=mscp${{ matrix.suffix }}
+          BIN=mscp
           ls -l $BIN
           if [ "${{ matrix.system }}" = "Darwin" ]; then
-            otool -L $BIN || true
-            echo "BIN_DYN=$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf "%s", $1}')" >> $GITHUB_ENV
-          else
-            ldd $BIN || true
+            otool -L $BIN || :
+            # echo "BIN_DYN=$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf "%s", $1}')" >> $GITHUB_ENV
+          elif [ "${{ matrix.system }}" = "Windows" ]; then
+            ldd $BIN || :
             echo "BIN_DYN=$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" >> $GITHUB_ENV
-          fi          
-          echo "BIN=$BIN" >> $GITHUB_ENV
+          fi
 
       # ==========================================================
       # ARTIFACTS
@@ -239,6 +243,6 @@ jobs:
         with:
           name: mscp-${{ matrix.name }}
           path: |
-            build/$BIN
+            build/mscp${{ matrix.suffix }}
             $BIN_DYN
           compression-level: 0
