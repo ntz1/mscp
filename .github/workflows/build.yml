@@ -219,14 +219,14 @@ jobs:
           make -j$($NPROC)
 
           echo "Checking for mscp..."
-          BIN=$BUILD_DIR/mscp${{ matrix.suffix }}
+          echo "BIN=$BUILD_DIR/mscp${{ matrix.suffix }}" >> $GITHUB_ENV
           ls -l $BIN
           if [ "${{ matrix.system }}" = "Darwin" ]; then
             otool -L $BIN
-            BIN_DYN="$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')"
+            echo "BIN_DYN=$(otool -L $BIN | awk '/^\s+\/.*\.dylib/{printf ",%s", $1}')" >> $GITHUB_ENV
           else
             ldd $BIN
-            BIN_DYN=",$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)"
+            echo "BIN_DYN=,$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" >> $GITHUB_ENV
           fi
 
       # ==========================================================
