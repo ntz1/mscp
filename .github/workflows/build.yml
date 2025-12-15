@@ -115,6 +115,7 @@ jobs:
       - name: Setup Environment
         run: |
           GITHUB_WORKSPACE="${{ github.workspace }}"
+          echo $GITHUB_WORKSPACE
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
             GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")
