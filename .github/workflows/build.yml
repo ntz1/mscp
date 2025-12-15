@@ -107,6 +107,8 @@ jobs:
 
       - name: Setup Environment
         run: |
+          echo "CFLAGS=\"-O3\"" >> $GITHUB_ENV
+
           GITHUB_WORKSPACE="${{ github.workspace }}"
 
           if [ "${{ matrix.system }}" = "Windows" ]; then
