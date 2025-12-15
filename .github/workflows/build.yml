@@ -92,7 +92,6 @@ jobs:
           msystem: MINGW64
           path-type: strict
           cache: false
-          update: true
           install: >-
             mingw-w64-x86_64-toolchain
             make
@@ -128,9 +127,9 @@ jobs:
         if: matrix.system == 'Windows'
         run: |
           echo "GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
-          echo "$GITHUB_WORKSPACE"
 
-      - run: |
+      - name: Prepare Workspace
+        run: |
           mkdir -p $GITHUB_WORKSPACE/deps
           echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
 
@@ -225,7 +224,7 @@ jobs:
             ldd $BIN
             echo "BIN_DYN=$(ldd $BIN | awk '{print $3}' | grep 'msys-.*\.dll' | paste -sd,)" >> $GITHUB_ENV
           fi          
-          echo "$BIN" >> $GITHUB_ENV
+          echo "BIN=$BIN" >> $GITHUB_ENV
 
       # ==========================================================
       # ARTIFACTS
