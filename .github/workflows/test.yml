@@ -10,13 +10,11 @@ jobs:
       run:
         shell: cmd        
     steps:
-      - uses: msys2/setup-msys2@v2
-
       - name: Test
         run: |
-          dir C:\msys64\usr\include
-          where msys2
-          msys2 -c 'uname -a'
+          dir C:\msys64\
+          C:\msys64\usr\bin\bash.exe -c 'uname -a'
+
 
 
 
