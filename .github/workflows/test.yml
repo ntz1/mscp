@@ -12,6 +12,8 @@ jobs:
     steps:
       - run: |
           $env:Path
+          dir c:\shells
+
 
 
 
