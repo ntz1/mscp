@@ -135,7 +135,6 @@ jobs:
       - run: |
           mkdir -p $GITHUB_WORKSPACE/deps
           echo "TARGET_DIR=$GITHUB_WORKSPACE/deps" >> $GITHUB_ENV
-          echo "BUILD_DIR=$GITHUB_WORKSPACE/build" >> $GITHUB_ENV
 
       # ==========================================================
       # DEPENDENCIES
@@ -203,23 +202,23 @@ jobs:
           # fi
 
           cmake .. \
-            -DCMAKE_FIND_ROOT_PATH=$TARGET_DIR \
-            -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER \
-            -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY \
-            -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY \
+            -G "Unix Makefiles" \
+            -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_PREFIX_PATH=$TARGET_DIR \
-            -DOPENSSL_USE_STATIC_LIBS=TRUE \
-            -DZLIB_LIBRARY=$TARGET_DIR/lib/libz.a \
-            -DZLIB_INCLUDE_DIR=$TARGET_DIR/include \
+            -DZLIB_ROOT_DIR=$TARGET_DIR \
             -DOPENSSL_ROOT_DIR=$TARGET_DIR \
-            -DOPENSSL_CRYPTO_LIBRARY=$TARGET_DIR/lib/libcrypto.a \
-            -DOPENSSL_INCLUDE_DIR=$TARGET_DIR/include
+            -DCMAKE_C_FLAGS="-DLIBSSH_STATIC"
+            # -DZLIB_LIBRARY=$TARGET_DIR/lib/libz.a \
+            # -DZLIB_INCLUDE_DIR=$TARGET_DIR/include \
+            # -DOPENSSL_ROOT_DIR=$TARGET_DIR \
+            # -DOPENSSL_CRYPTO_LIBRARY=$TARGET_DIR/lib/libcrypto.a \
+            # -DOPENSSL_INCLUDE_DIR=$TARGET_DIR/include \
 
           make -j$($NPROC)
 
           echo "Checking for mscp..."
-          echo "BIN=$BUILD_DIR/mscp${{ matrix.suffix }}" >> $GITHUB_ENV
+          echo "BIN=mscp${{ matrix.suffix }}" >> $GITHUB_ENV
           ls -l $BIN
           if [ "${{ matrix.system }}" = "Darwin" ]; then
             otool -L $BIN
@@ -236,4 +235,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mscp-${{ matrix.name }}
-          path: $BIN$BIN_DYN
+          path: build/$BIN$BIN_DYN
