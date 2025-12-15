@@ -8,7 +8,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Test
+        shell: cmd
         run: |
           dir C:\msys64
           where msys2bash
+
 
