@@ -130,7 +130,8 @@ jobs:
       - name: Setup Environment (Windows)
         if: matrix.system == 'Windows'
         run: |
-          echo "GITHUB_WORKSPACE=$(cygpath -u "$GITHUB_WORKSPACE")" >> $GITHUB_ENV
+          GW=$(cygpath -u "$GITHUB_WORKSPACE")
+          echo "GITHUB_WORKSPACE=$GW" >> $GITHUB_ENV
 
       - run: |
           mkdir -p $GITHUB_WORKSPACE/deps
@@ -218,7 +219,8 @@ jobs:
           make -j$($NPROC)
 
           echo "Checking for mscp..."
-          echo "BIN=mscp${{ matrix.suffix }}" >> $GITHUB_ENV
+          BIN=mscp${{ matrix.suffix }}
+          echo "$BIN" >> $GITHUB_ENV
           ls -l $BIN
           if [ "${{ matrix.system }}" = "Darwin" ]; then
             otool -L $BIN
