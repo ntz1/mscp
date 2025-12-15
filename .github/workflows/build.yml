@@ -203,7 +203,7 @@ jobs:
           # fi
 
           if [ "${{ matrix.system }}" != "Darwin" ]; then
-            CMAKE_ARGS="-DCMAKE_EXE_LINKER_FLAGS=\"-static -static-libgcc\""
+            CMAKE_ARGS="-DCMAKE_EXE_LINKER_FLAGS=\"-static\""
           fi
 
           cmake .. \
