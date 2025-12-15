@@ -11,7 +11,8 @@ jobs:
     #     shell: cmd        
     steps:
       - run: |
-          echo $shellPath
+          $env:Path
+
 
 
 
