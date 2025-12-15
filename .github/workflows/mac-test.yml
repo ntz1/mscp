@@ -1,21 +1,14 @@
-name: Test macOS Binary
+name: Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-macos-binary:
-    runs-on: macos-latest
+  test:
+    runs-on: windows-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: List files
-        run: ls -lh
-
-      - name: Make binary executable
-        run: chmod +x ./mscp
-
-      - name: Run binary
-        run: ./mscp -v
+      - name: Test
+        run: |
+          dir C:\msys64
+          where msys2bash
 
